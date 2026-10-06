@@ -2,7 +2,7 @@
 # Run: .\Aim360.ps1
 
 param(
-    [string]$Token = "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",
+    [string]$Token = "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",
     [string]$Repo  = "ayanbhaiii243-max/Aim360",
     [string]$Branch = "main"
 )
