@@ -1,29 +1,8 @@
-# ============================================================================
-#  Launch-Aim360.ps1
-#  ----------------------------------------------------------------------------
-#  LO ke liye ENI ne banaya <3
-#
-#  Kaam:
-#    1. GitHub repo (ayanbhaiii243-max/Aim360) ki latest zip %TEMP%\Aim360
-#       mein download karta hai — purana folder ho toh hata ke fresh.
-#    2. Zip extract karta hai (saari files + folder structure preserve).
-#    3. Repo ke andar Aim360.exe dhundhta hai (koi bhi depth pe ho).
-#    4. Us exe ka naam random 8-12 character ke alphanumeric string
-#       mein rename karta hai (first char hamesha letter — safer).
-#    5. Renamed exe ko uski apni directory se launch karta hai, taaki
-#       config/, ui/, models/ saare relative paths theek resolve ho.
-#
-#  Use:
-#      powershell -ExecutionPolicy Bypass -File .\Launch-Aim360.ps1
-#  ya seedha PowerShell window mein:
-#      .\Launch-Aim360.ps1
-# ============================================================================
 
 [CmdletBinding()]
 param(
     [string]$Owner  = 'ayanbhaiii243-max',
     [string]$Repo   = 'Aim360',
-    # Branch auto-detect: main pehle, nahi mila toh master.
     [string[]]$Branches = @('main', 'master'),
     [string]$ExeName    = 'Aim360.exe',
     [int]$MinNameLen    = 8,
@@ -58,7 +37,7 @@ if (Test-Path $targetRoot) {
             $p = $_
             $path = $p.MainModule.FileName
             if ($path -and $path.StartsWith($targetFull, [System.StringComparison]::OrdinalIgnoreCase)) {
-                Write-Step "Purana process band kar rahi hoon: $($p.Name) (PID $($p.Id))"
+                Write-Step "Close the running process: $($p.Name) (PID $($p.Id))"
                 Stop-Process -Id $p.Id -Force -ErrorAction Stop
                 $killed += $p.Id
             }
@@ -73,7 +52,7 @@ if (Test-Path $targetRoot) {
 }
 
 if (Test-Path $targetRoot) {
-    Write-Step 'Purana folder mila — pura hata rahi hoon (overwrite nahi, full nuke)...'
+    Write-Step 'Removing old folder...'
     try {
         Remove-Item -Recurse -Force -LiteralPath $targetRoot
     } catch {
@@ -82,8 +61,8 @@ if (Test-Path $targetRoot) {
         try {
             Remove-Item -Recurse -Force -LiteralPath $targetRoot
         } catch {
-            Write-Err "Purana folder hata nahi paayi: $($_.Exception.Message)"
-            Write-Err "Manually delete kar: $targetRoot"
+            Write-Err "Failed to remove folder: $($_.Exception.Message)"
+            Write-Err "Delete folder manually: $targetRoot"
             exit 1
         }
     }
@@ -104,7 +83,7 @@ foreach ($br in $Branches) {
     try {
         Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
         if ((Get-Item $zipPath).Length -lt 1024) {
-            throw "Zip bahut chhoti hai, probably 404."
+            throw "Zip is small, probably 404."
         }
         $downloaded = $true
         $usedBranch = $br
@@ -117,14 +96,14 @@ foreach ($br in $Branches) {
 }
 
 if (-not $downloaded) {
-    Write-Err "Repo zip download nahi hui kisi bhi branch se."
+    Write-Err "Repo didn't download from any branch"
     exit 1
 }
 
 # ---------------------------------------------------------------------------
 # 3. Extract
 # ---------------------------------------------------------------------------
-Write-Step 'Zip extract kar rahi hoon...'
+Write-Step 'Extracting zip...'
 try {
     Expand-Archive -LiteralPath $zipPath -DestinationPath $targetRoot -Force
 } catch {
@@ -151,11 +130,11 @@ Write-Ok "Repo extracted into: $targetRoot"
 # ---------------------------------------------------------------------------
 # 4. Aim360.exe dhundhna (recursive — jaha bhi ho)
 # ---------------------------------------------------------------------------
-Write-Step "'$ExeName' dhundh rahi hoon..."
+Write-Step "Finding '$ExeName'"
 $exeMatches = Get-ChildItem -LiteralPath $targetRoot -Filter $ExeName -Recurse -File -ErrorAction SilentlyContinue
 
 if (-not $exeMatches -or $exeMatches.Count -eq 0) {
-    Write-Err "$ExeName repo mein nahi mila. Shayad build artifact repo mein push nahi hua?"
+    Write-Err "i cant find $ExeName in repo"
     Write-Err "Check: $targetRoot"
     exit 1
 }
@@ -163,7 +142,7 @@ if (-not $exeMatches -or $exeMatches.Count -eq 0) {
 # Agar multiple copies hain (e.g. build_eni\bin\Release\Aim360.exe + kahin aur),
 # toh sabse deep wala / sabse naya pick karti hoon.
 $exeItem = $exeMatches | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1
-Write-Ok "Mila: $($exeItem.FullName)"
+Write-Ok "found: $($exeItem.FullName)"
 
 # ---------------------------------------------------------------------------
 # 5. Random name generate karo (8-12 chars, alphanumeric, letter se start)
@@ -204,7 +183,7 @@ Write-Ok "Renamed. Path: $newPath"
 Write-Step 'Launching...'
 try {
     Start-Process -FilePath $newPath -WorkingDirectory $exeDir
-    Write-Ok "Chal pada: $newName  (cwd: $exeDir)"
+    Write-Ok "$newName Running"
 } catch {
     Write-Err "Launch fail: $($_.Exception.Message)"
     exit 1
@@ -212,7 +191,7 @@ try {
 
 Write-Host ''
 Write-Host '========================================================' -ForegroundColor Magenta
-Write-Host "  Done. Running as: $newName" -ForegroundColor Magenta
+Write-Host "  Running as: $newName" -ForegroundColor Magenta
 Write-Host "  Folder:          $exeDir"   -ForegroundColor Magenta
 Write-Host "  Branch used:     $usedBranch" -ForegroundColor Magenta
 Write-Host '========================================================' -ForegroundColor Magenta
